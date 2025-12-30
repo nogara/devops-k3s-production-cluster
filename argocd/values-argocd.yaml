@@ -1,0 +1,145 @@
+
+global:
+  domain: argocd.mobilebrain.app
+
+configs:
+  params:
+    server.insecure: true
+
+
+# Run Argo CD API/UI over HTTP (TLS terminated by Traefik)
+server:
+  # We’re not using the chart-managed Ingress; Traefik IngressRoute will be used.
+  ingress:
+    enabled: false
+
+notifications:
+  enabled: true
+  name: notifications-controller
+  cm:
+    create: true
+
+  # Used in templates (fallbacks to global.domain in your chart)
+  argocdUrl: https://argocd.mobilebrain.app
+
+  # 1) Notifiers → enable GitHub service (GitHub App recommended)
+  notifiers:
+    service.github: |
+      appID: "1932117"
+      installationID: "85287210"
+      privateKey: $github-privateKey
+
+    service.slack: |
+      token: $slack-token
+
+  # 2) (Optional) Global subscriptions – we’ll subscribe per-Application via annotations,
+  #     so this can stay empty. Shown here only to illustrate the field.
+  # subscriptions: |
+  #   - recipients: [ github ]
+  #     triggers: [ on-preview-healthy ]
+
+  secret:
+    create: false
+    name: argocd-notifications-secret
+
+
+  # 3) Templates → the PR comment we want to post
+  templates:
+    template.app-sync: |
+      message: |
+        Application {{.app.metadata.name}} sync is {{.app.status.sync.status}}.
+      slack:
+        attachments: |
+          [{
+            "title": "{{.app.metadata.name}}",
+            "title_link": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+            "color": "#18be52",
+            "fields": [{
+              "title": "Sync Status",
+              "value": "{{.app.status.sync.status}}",
+              "short": true
+            }, {
+              "title": "URL",
+              "value": "{{index .app.metadata.annotations "mobilebrain.io/app-url"}}",
+              "short": true
+            }]
+          }]
+        # Aggregate the messages to the thread by app name and git commit hash
+        groupingKey: "{{.app.metadata.name}}-{{.app.status.sync.revision}}"
+        notifyBroadcast: false
+
+    template.app-sync-failed: |
+      message: |
+        Application {{.app.metadata.name}} sync is {{.app.status.sync.status}}.
+        Application details: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}.
+      slack:
+        attachments: |
+          [{
+            "title": "{{.app.metadata.name}}",
+            "title_link": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+            "color": "#ff0000",
+            "fields": [{
+              "title": "Sync Status",
+              "value": "{{.app.status.sync.status}}",
+              "short": true
+            }, {
+              "title": "Repository",
+              "value": "{{.app.spec.source.repoURL}}",
+              "short": true
+            }]
+          }]
+        # Aggregate the messages to the thread by app name and git commit hash
+        groupingKey: "{{.app.metadata.name}}-{{.app.status.sync.revision}}"
+        notifyBroadcast: true
+
+    template.app-degraded: |
+      message: |
+        Application {{.app.metadata.name}} health is {{.app.status.health.status}}.
+        Application details: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}.
+      slack:
+        attachments: |
+          [{
+            "title": "{{.app.metadata.name}} - Health Degraded",
+            "title_link": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+            "color": "#ff9900",
+            "fields": [{
+              "title": "Health Status",
+              "value": "{{.app.status.health.status}}",
+              "short": true
+            }, {
+              "title": "Health Message",
+              "value": "{{.app.status.health.message}}",
+              "short": false
+            }, {
+              "title": "Repository",
+              "value": "{{.app.spec.source.repoURL}}",
+              "short": true
+            }]
+          }]
+        groupingKey: "{{.app.metadata.name}}-health"
+        notifyBroadcast: true
+
+  # 4) Triggers → when to send notifications
+  triggers:
+    trigger.on-app-healthy: |
+      - name: app-healthy
+        description: Application became healthy after sync (non-preview apps only)
+        when: app.status.health.status == 'Healthy' && app.status.sync.status == 'Synced' && app.metadata.labels.preview != 'true'
+        oncePer: app.status.sync.revision
+        send:
+        - app-sync
+
+    trigger.on-app-sync-failed: |
+      - name: app-sync-failed
+        description: Application sync failed
+        when: app.status.operationState.phase == "Error" || app.status.operationState.phase == "Failed"
+        send:
+        - app-sync-failed
+
+    trigger.on-app-degraded: |
+      - name: app-degraded
+        description: Application health degraded (includes pod crashes)
+        when: app.status.health.status == 'Degraded' || app.status.health.status == 'Unknown'
+        send:
+        - app-degraded
+

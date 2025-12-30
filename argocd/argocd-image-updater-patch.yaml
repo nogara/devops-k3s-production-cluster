@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+      - name: argocd-image-updater
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-ecr-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-ecr-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            secretKeyRef:
+              name: aws-ecr-credentials
+              key: AWS_DEFAULT_REGION
+        - name: ARGOCD_IMAGE_UPDATER_REGISTRIES_CONF
+          value: "/app/config/registries.conf"
+        volumeMounts:
+        - name: image-updater-conf
+          mountPath: /app/config
+        - name: auth-scripts
+          mountPath: /scripts
+      volumes:
+      - name: image-updater-conf
+        configMap:
+          name: argocd-image-updater-config
+          items:
+          - key: registries.conf
+            path: registries.conf
+      - name: auth-scripts
+        configMap:
+          name: argocd-image-updater-config
+          defaultMode: 0755
+          items:
+          - key: auth1.sh
+            path: auth1.sh

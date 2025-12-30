@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd
+data:
+  git.committer.name: Argo CD Image Updater
+  git.committer.email: argocd-image-updater@mobilebrain.com.br
+  git.signoff: "true"
+  registries.conf: |
+    registries:
+      - name: ECR
+        api_url: https://488690973251.dkr.ecr.us-east-1.amazonaws.com
+        prefix: 488690973251.dkr.ecr.us-east-1.amazonaws.com
+        ping: true
+        default: true
+        insecure: false
+        credentials: ext:/scripts/auth1.sh
+        credsexpire: 10h
+  auth1.sh: |
+    #!/bin/sh
+    aws ecr --region "us-east-1" get-authorization-token --output text --query 'authorizationData[].authorizationToken' | base64 -d
