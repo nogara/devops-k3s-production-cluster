@@ -3,3 +3,6 @@ argocd/secrets.yaml
 argocd/repo-mobilebrain-manifests-secrets.yaml
 argocd/values-argocd-secrets.yaml
 argocd/argocd-notifications-secret.yaml
+
+*secrets.yaml
+!*sealed-secrets.yaml
