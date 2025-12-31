@@ -1,0 +1,52 @@
+config:
+  issuer: https://dex.mobilebrain.app
+  storage:
+    type: kubernetes
+    config:
+      inCluster: true
+
+  # Static client for kubelogin / kubectl OIDC
+  staticClients:
+  - id: kubelogin
+    name: "kubelogin"
+    public: true
+    redirectURIs:
+    - http://localhost:8000
+    - http://127.0.0.1:8000
+
+  connectors:
+  - type: google
+    id: google
+    name: Google
+    config:
+      clientID: 719690586138-eocnd0j4k5p73itk53ltmop7fima97b7.apps.googleusercontent.com
+      clientSecret: "${DEX_GOOGLE_CLIENT_SECRET}"
+      redirectURI: https://dex.mobilebrain.app/callback
+      hostedDomains:
+        - mobilebrain.com.br
+      serviceAccountFilePath: /etc/dex/creds/google-sa.json
+      domainToAdminEmail:
+       "*": nogara@mobilebrain.com.br
+      groups:
+        - k8s-admins@mobilebrain.com.br
+        - k8s-developers@mobilebrain.com.br
+
+volumes:
+- name: google-sa
+  secret:
+    secretName: dex-google-sa
+
+volumeMounts:
+- name: google-sa
+  mountPath: /etc/dex/creds
+  readOnly: true
+
+
+envVars:
+  - name: DEX_LOG_LEVEL
+    value: info
+  - name: DEX_GOOGLE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-google-client-secret
+        key: clientSecret

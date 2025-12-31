@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dex
+  namespace: auth
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`dex.mobilebrain.app`)
+      priority: 10
+      services:
+        - name: dex
+          port: 5556
+  tls:
+    certResolver: default
