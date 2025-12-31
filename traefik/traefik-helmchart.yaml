@@ -4,7 +4,6 @@ metadata:
   name: traefik
   namespace: kube-system
 spec:
-  repo: https://traefik.github.io/charts
   chart: traefik
   version: "" # leave empty for latest, or specify a version
   targetNamespace: kube-system
